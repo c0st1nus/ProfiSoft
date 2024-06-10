@@ -19,7 +19,7 @@ def send_welcome(message):
 # Обработка команды Today
 @bot.message_handler(func=lambda message: message.text == 'Today')
 def send_today(message):
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = datetime.now().strftime('%d-%m-%Y')
     bot.send_message(message.chat.id, f'Today is {today}')
 
 
@@ -39,7 +39,7 @@ def generate_calendar(year=None, month=None):
 
     markup = types.InlineKeyboardMarkup()
     # Заголовок с месяцем и годом
-    row = [types.InlineKeyboardButton(f'{year}-{month}', callback_data='ignore')]
+    row = [types.InlineKeyboardButton(f'{calendar.month_name[month]} {year}', callback_data='ignore')]
     markup.row(*row)
 
     # Названия дней недели
@@ -70,8 +70,9 @@ def generate_calendar(year=None, month=None):
 # Обработка коллбеков из календаря
 @bot.callback_query_handler(func=lambda call: call.data.startswith('day-'))
 def callback_select_day(call):
-    day = call.data.split('-')[3]
-    bot.send_message(call.message.chat.id, f'You selected {day}')
+    year, month, day = map(int, call.data.split('-')[1:])
+    date = f'{day:02d}-{month:02d}-{year}'
+    bot.send_message(call.message.chat.id, f'You selected {date}')
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('prev-'))
