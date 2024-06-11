@@ -1,13 +1,16 @@
 import telebot
 from telebot import types
 import sqlite3
-import datetime
+from datetime import datetime
 import calendar
 
 bot = telebot.TeleBot("7047928321:AAEnZNpdK3HUWtIh3RUS-xRDfdAJqe34DMA")
 HR = 1239398217
 hr_chat = None
 vac = []
+date = None
+id = None
+chat = None
 
 
 def generate_vacancy_buttons(vacancies):
@@ -188,12 +191,16 @@ def candidates(message, i: int, data: list):
             bot.send_message(message.chat.id, generate_candidate_text(data[i]), reply_markup=get_vacancies())
             bot.register_next_step_handler(message, candidates, i, data)
         elif message.text == "Пригласить на собеседование✅":
+            global id
+            global chat
             conn = sqlite3.connect("SqlLite.db")
             cur = conn.cursor()
             cur.execute(f"UPDATE `candidates` SET `Accepted` = '1' WHERE `ID` = '{data[i][6]}';")
+            id = data[i][6]
+            chat = data[i][7]
             conn.commit()
-            bot.send_message(message.chat.id, "На какое время вы хотите назначить собеседование?", reply_markup=generate_calendar(2024, 6))
-            bot.register_next_step_handler(message, interview, data)
+            bot.send_message(message.chat.id, "Когда хотите назначить собеседование?", reply_markup=generate_calendar(datetime.now().year, datetime.now().month))
+            bot.register_next_step_handler(message, candidates, 0, data)
         elif message.text == "❌":
             conn = sqlite3.connect("SqlLite.db")
             cur = conn.cursor()
@@ -286,13 +293,47 @@ def generate_calendar(year=None, month=None):
 
     return markup
 
+def generate_time_keyboard(date):
+    markup = types.InlineKeyboardMarkup()
+    row1 = []
+    row2 = []
+    for hour in range(8, 19):
+        button = types.InlineKeyboardButton(str(hour), callback_data=f'hour-{hour}')
+        if hour % 2 == 0:
+            row1.append(button)
+        else:
+            row2.append(button)
+    markup.row(*row1)
+    markup.row(*row2)
+    return markup
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('hour-'))
+def callback_select_hour(call):
+    print(id)
+    conn = sqlite3.connect("SqlLite.db")
+    cur = conn.cursor()
+    hour = int(call.data.split('-')[1])
+    bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    cur.execute(f"UPDATE `candidates` SET `DateOfMeet` = '{date} {hour}:00' WHERE `ID` = '{id}';")
+    conn.commit()
+    bot.send_message(call.message.chat.id, f'Вы назначили собеседование {date} на {hour}:00')
+    bot.send_message(chat, f'Вас пригласили на собеседование {date} в {hour}:00')
+    bot.send_message(chat, f"Устраивает ли вас назначенное время или вы хотите выбрать другие слоты?", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(types.KeyboardButton(text="Устраивает")).add(types.KeyboardButton(text="Выбрать другое время")))
+
+
+
+@bot.message_handler(func=lambda message: message.text == 'Выбрать другое время')
+def HR_date(message):
+    bot.send_message(message.chat.id, f"Хорошо, скоро с вами свяжется наш Hr для назначения нового времени")
+    bot.send_message(HR, f"Кандидат @{message.from_user.username} желает связаться с ним в другое время")
 
 # Обработка коллбеков из календаря
 @bot.callback_query_handler(func=lambda call: call.data.startswith('day-'))
 def callback_select_day(call):
+    global date
     year, month, day = map(int, call.data.split('-')[1:])
-    date = f'{day:02d}-{month:02d}-{year}'
-    bot.send_message(call.message.chat.id, f'You selected {date}')
+    date = f'{day:02d}-{month:02d}-{year} '
+    bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=generate_time_keyboard(date))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('prev-'))
