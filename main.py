@@ -3,9 +3,12 @@ from telebot import types
 import sqlite3
 from datetime import datetime
 import calendar
+from PyPDF2 import PdfFileReader
+from docx import Document
+import io
 
 bot = telebot.TeleBot("7047928321:AAEnZNpdK3HUWtIh3RUS-xRDfdAJqe34DMA")
-HR = 1239398217
+HR = 123939821
 hr_chat = None
 vac = []
 date = None
@@ -101,12 +104,36 @@ try:
 
 
     def resume(message, id):
+        global text
+        if message.content_type == 'document':
+            file_info = bot.get_file(message.document.file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+
+            # Если документ Word
+            if message.document.mime_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                document = Document(io.BytesIO(downloaded_file))
+                text = '\n'.join([paragraph.text for paragraph in document.paragraphs])
+            # Если PDF (нужна библиотека PyPDF2)
+            elif message.document.mime_type == 'application/pdf':
+                reader = PdfFileReader(io.BytesIO(downloaded_file))
+                text = '\n'.join([reader.getPage(i).extractText() for i in range(reader.getNumPages())])
+            else:
+                bot.send_message(message.chat.id, "Пожалуйста, отправьте документ в формате Word или PDF.")
+                bot.register_next_step_handler(message, resume)
+        elif message.content_type == 'text':
+            text = message.text
+        else:
+            bot.send_message(message.chat.id,
+                             "Пожалуйста, отправьте ваше резюме в виде документа или текстового сообщения.")
+            bot.register_next_step_handler(message, resume)
+
         conn = sqlite3.connect("SqlLite.db")
         cur = conn.cursor()
-        cur.execute(f"UPDATE `candidates` SET `Resume` = '{message.text}' WHERE `ID` = '{id}';")
+        cur.execute(f"UPDATE `candidates` SET `Resume` = {text} WHERE `ID` = {id};", (text, id))
         conn.commit()
         conn.close()
-        bot.send_message(message.chat.id, f"Отлчино! Перед приглашением на интервью ответьте пожалуйста на пару вопросов")
+        bot.send_message(message.chat.id,
+                         f"Отлично! Перед приглашением на телефонное интервью ответьте пожалуйста на пару вопросов")
         bot.send_message(message.chat.id, "Укажите ваш контактный номер телефона (10 цифр без кода страны)")
         bot.register_next_step_handler(message, phone, id)
 
@@ -149,7 +176,7 @@ try:
         cur.execute(
             f"UPDATE `candidates` SET (`Achievements`, `ChatID`) = ('{message.text}', {message.from_user.id}) WHERE `ID` = '{id}';")
         conn.commit()
-        bot.send_message(message.chat.id, "Отлично, ожидайте пока наш HR откликнется на ваше резюме")
+        bot.send_message(message.chat.id, "Отлично, наш HR уже взял в обработку ваше резюме")
         main(message)
 
 
@@ -357,9 +384,9 @@ try:
         new_date_str = f"{date_obj.day} {months[date_obj.month]}"
         bot.send_message(message.chat.id, f'Вы назначили собеседование {new_date_str} на {hour}:00, в {format} формате', reply_markup=types.ReplyKeyboardRemove())
         if format == "Офлайн":
-            text = f"Поздравляю! Вас пригласили на собеседование. Ждем вас {new_date_str} в наш офис г.Костанай, ул.Дзержинского, 92А, 2 этаж. в {hour}:00."
+            text = f"Мы приглашаем вас на собеседование в {format} {new_date_str} в наш офис г.Костанай, ул.Дзержинского, 92А, 2 этаж. в {hour}:00."
         if format == "Онлайн":
-            text = f"Поздравляю! Вас пригласили на собеседование {new_date_str} в {hour}:00."
+            text = f"Мы приглашаем вас на собеседование в {format} {new_date_str} в {hour}:00. Ссылка будет ниже"
         if message.text != "0":
             text += f"\nКоментарий: {message.text}"
         bot.send_message(chat, text)
@@ -369,12 +396,12 @@ try:
 
     @bot.message_handler(func=lambda message: message.text == 'Да')
     def HR_date(message):
-        bot.send_message(message.chat.id, f"Хорошо, напишите на почту hr.zhanark@profi-soft.kz, скоро с вами свяжется наш Hr для назначения нового времени", reply_markup=types.ReplyKeyboardRemove())
+        bot.send_message(message.chat.id, f"Хорошо, напишите на почту hr.zhanark@profi-soft.kz, скоро с вами свяжется наш HR для согласования нового времени. А пока можете посетить наш [сайт](https://profi-soft.kz/), чтобы познакомиться поближе с нашей командой и корпоративной группой", reply_markup=types.ReplyKeyboardRemove())
         bot.send_message(HR, f"Кандидат @{message.from_user.username} желает связаться с ним в другое время, ожидайте сообщения на почту")
 
     @bot.message_handler(func=lambda message: message.text == 'Нет')
     def HR_date2(message):
-        bot.send_message(message.chat.id, "Отлично! Будем ждать вас в назначенное время")
+        bot.send_message(message.chat.id, "Отлично! Будем ждать вас в это время. Берегите себя! А пока можете посетить наш [сайт](https://profi-soft.kz/), чтобы познакомиться поближе с нашей командой и корпоративной группой", reply_markup=types.ReplyKeyboardRemove())
 
     # Обработка коллбеков из календаря
     @bot.callback_query_handler(func=lambda call: call.data.startswith('day-'))
