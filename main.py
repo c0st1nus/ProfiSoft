@@ -8,7 +8,7 @@ from docx import Document
 import io
 
 bot = telebot.TeleBot("7047928321:AAEnZNpdK3HUWtIh3RUS-xRDfdAJqe34DMA")
-HR = 123939821
+HR = 1239398217
 hr_chat = None
 vac = []
 date = None
@@ -24,15 +24,14 @@ try:
 
 
     def generate_candidate_text(i):
-        text = ""
-        text += f"Вакансия: {i[9]}\n"
-        text += f"Имя: {i[0]}\n"
-        text += f"Возраст: {i[4]}\n"
-        text += f"Телефон: {i[3]}\n"
-        text += f"Резюме: {i[2]}\n"
-        text += f"Достижения: {i[5]}\n"
-        text += "------------------------------------\n"
-        return text
+        Text = ""
+        Text += f"**Вакансия:** {i[9]}\n"
+        Text += f"\n**Имя:** {i[0]}\n"
+        Text += f"\n**Возраст:** {i[4]}\n"
+        Text += f"\n**Телефон:** {i[3]}\n"
+        Text += f"\n**Резюме:** {i[2]}\n"
+        Text += f"\n**Достижения:** {i[5]}\n"
+        return Text
 
 
     def get_vacancies():
@@ -126,10 +125,10 @@ try:
             bot.send_message(message.chat.id,
                              "Пожалуйста, отправьте ваше резюме в виде документа или текстового сообщения.")
             bot.register_next_step_handler(message, resume)
-
+        print(text)
         conn = sqlite3.connect("SqlLite.db")
         cur = conn.cursor()
-        cur.execute(f"UPDATE `candidates` SET `Resume` = {text} WHERE `ID` = {id};", (text, id))
+        cur.execute("UPDATE `candidates` SET `Resume` = ? WHERE `ID` = ?", (text, id))
         conn.commit()
         conn.close()
         bot.send_message(message.chat.id,
@@ -205,7 +204,7 @@ try:
                 bot.send_message(message.chat.id, "Кандидатов нет", reply_markup=main_markup())
                 hr(message)
             else:
-                bot.send_message(message.chat.id, generate_candidate_text(data[0]), reply_markup=get_vacancies())
+                bot.send_message(message.chat.id, generate_candidate_text(data[0]), reply_markup=get_vacancies(), parse_mode='Markdown')
                 bot.register_next_step_handler(message, candidates, 0, data)
         else:
             bot.send_message(message.chat.id, "Чем могу помочь?", reply_markup=main_markup())
@@ -218,13 +217,13 @@ try:
                 i += 1
                 if i >= len(data):
                     i = 0
-                bot.send_message(message.chat.id, generate_candidate_text(data[i]), reply_markup=get_vacancies())
+                bot.send_message(message.chat.id, generate_candidate_text(data[i]), reply_markup=get_vacancies(), parse_mode='Markdown')
                 bot.register_next_step_handler(message, candidates, i, data)
             elif message.text == "◀️Назад":
                 i -= 1
                 if i < 0:
                     i = len(data) - 1
-                bot.send_message(message.chat.id, generate_candidate_text(data[i]), reply_markup=get_vacancies())
+                bot.send_message(message.chat.id, generate_candidate_text(data[i]), reply_markup=get_vacancies(), parse_mode='Markdown')
                 bot.register_next_step_handler(message, candidates, i, data)
             elif message.text == "Пригласить на собеседование✅":
                 global id
@@ -244,8 +243,8 @@ try:
                 cur.execute(f"INSERT into `reservation` (`Date_Of_Reservation`, `Name`, `Resume`, `PhoneNumber`, `Age`, `Achievements`, `Chat_ID`, `Vacancy`) VALUES ('{date}', '{data[i][0]}', '{data[i][2]}', '{data[i][3]}', {data[i][4]}, '{data[i][5]}', '{data[i][7]}', '{data[i][9]}');")
                 conn.commit()
                 data.remove(data[i])
-                bot.send_message(message.chat.id, f"Кандидат {data[i][0]} отправлен в резерв", reply_markup=get_vacancies())
-                bot.send_message(message.chat.id, generate_candidate_text(data[0]), reply_markup=get_vacancies())
+                bot.send_message(message.chat.id, f"Кандидат {data[i][0]} отправлен в резерв", reply_markup=get_vacancies(), parse_mode='Markdown')
+                bot.send_message(message.chat.id, generate_candidate_text(data[0]), reply_markup=get_vacancies(), parse_mode='Markdown')
                 bot.register_next_step_handler(message, candidates, 0, data)
             elif message.text == "Выйти в главное меню":
                 main(message)
@@ -332,18 +331,14 @@ try:
 
         return markup
 
+
     def generate_time_keyboard(date):
         markup = types.InlineKeyboardMarkup()
-        row1 = []
-        row2 = []
-        for hour in range(8, 19):
-            button = types.InlineKeyboardButton(str(hour), callback_data=f'hour-{hour}')
-            if hour % 2 == 0:
-                row1.append(button)
-            else:
-                row2.append(button)
-        markup.row(*row1)
-        markup.row(*row2)
+        hours = []
+        for i in range(11, 21):
+            hours.append(types.InlineKeyboardButton(f'{i}:00', callback_data=f'hour-{i}'))
+        markup.row(*hours[:5])
+        markup.row(*hours[5:])
         return markup
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith('hour-'))
@@ -396,12 +391,12 @@ try:
 
     @bot.message_handler(func=lambda message: message.text == 'Да')
     def HR_date(message):
-        bot.send_message(message.chat.id, f"Хорошо, напишите на почту hr.zhanark@profi-soft.kz, скоро с вами свяжется наш HR для согласования нового времени. А пока можете посетить наш [сайт](https://profi-soft.kz/), чтобы познакомиться поближе с нашей командой и корпоративной группой", reply_markup=types.ReplyKeyboardRemove())
+        bot.send_message(message.chat.id, f"Хорошо, напишите на почту hr.zhanark@profi-soft.kz, скоро с вами свяжется наш HR для согласования нового времени. А пока можете посетить наш [сайт](https://profi-soft.kz/), чтобы познакомиться поближе с нашей командой и корпоративной группой", reply_markup=types.ReplyKeyboardRemove(), parse_mode='Markdown')
         bot.send_message(HR, f"Кандидат @{message.from_user.username} желает связаться с ним в другое время, ожидайте сообщения на почту")
 
     @bot.message_handler(func=lambda message: message.text == 'Нет')
     def HR_date2(message):
-        bot.send_message(message.chat.id, "Отлично! Будем ждать вас в это время. Берегите себя! А пока можете посетить наш [сайт](https://profi-soft.kz/), чтобы познакомиться поближе с нашей командой и корпоративной группой", reply_markup=types.ReplyKeyboardRemove())
+        bot.send_message(message.chat.id, "Отлично! Будем ждать вас в это время. Берегите себя! А пока можете посетить наш [сайт](https://profi-soft.kz/), чтобы познакомиться поближе с нашей командой и корпоративной группой", reply_markup=types.ReplyKeyboardRemove(), parse_mode='Markdown')
 
     # Обработка коллбеков из календаря
     @bot.callback_query_handler(func=lambda call: call.data.startswith('day-'))
